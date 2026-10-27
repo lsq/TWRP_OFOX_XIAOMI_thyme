@@ -25,6 +25,12 @@ If there are any issues relating the build tree info (not the workflow file conf
  - LDCHECK (path to your target binary file, ie. `system/bin/qseecomd`)
    - If you are building manually/locally and you want to use ldcheck for checking dependencies, visit [THIS](https://github.com/TeamWin/android_device_qcom_twrp-common/tree/android-11#using-ldcheck-to-find-dependencies) for guide.
 
+## Device Tree
+
+* [Mi 10s](https://github.com/MinecraftVM/xiaomi_thyme_twrp_tree)
+* [Mi 10s](https://github.com/sekaiacg/device_xiaomi_alioth-TWRP/tree/android-13)
+* [SM8250内核构建](https://github.com/clcwpwqi/xiaomi_sm8250_kernel)
+
 ## Notes
 
 - If you created your account on GitHub.com after July 18, 2017, your noreply email address for GitHub is an ID number and your username in the form of ID+USERNAME@users.noreply.github.com. If you created your account on GitHub.com prior to July 18, 2017, and enabled `Keep my email address private` prior to that date, your noreply email address from GitHub is USERNAME@users.noreply.github.com. You can get an ID-based noreply email address for GitHub by selecting (or deselecting and reselecting) Keep my email address private in your email settings.
