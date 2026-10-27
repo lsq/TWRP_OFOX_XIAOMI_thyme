@@ -3,6 +3,10 @@ name: OrangeFox [OFRP]
 on:
   workflow_dispatch:
     inputs:
+      debug_enabled:
+        required: false
+        default: false
+        type: boolean
       MANIFEST_BRANCH:
         description: 'OrangeFox Manifest Branch'
         required: true
@@ -109,12 +113,39 @@ jobs:
         source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
         set -e
-        lunch twrp_${{ inputs.DEVICE_NAME }}-eng && make clean && mka adbd ${{ inputs.BUILD_TARGET }}image
+        if [ -f ${{ github.event.inputs.DEVICE_PATH }}/lineage_${{ inputs.DEVICE_NAME }}.mk ]; then
+          mv ${{ github.event.inputs.DEVICE_PATH }}/lineage_${{ github.event.inputs.DEVICE_NAME}}.mk ${{ github.event.inputs.DEVICE_PATH }}/twrp_${{ github.event.inputs.DEVICE_NAME}}.mk
+          sed -i "s/lineage_${{ github.event.inputs.DEVICE_NAME }}/twrp_${{ github.event.inputs.DEVICE_NAME }}/g" ${{ github.event.inputs.DEVICE_PATH }}/twrp_${{ github.event.inputs.DEVICE_NAME}}.mk
+          sed -i "s/lineage_${{ github.event.inputs.DEVICE_NAME }}/twrp_${{ github.event.inputs.DEVICE_NAME }}/g" ${{ github.event.inputs.DEVICE_PATH }}/AndroidProducts.mk
+        fi
+        if [ -f ${{ github.event.inputs.DEVICE_PATH }}/omni_${{ inputs.DEVICE_NAME }}.mk ]; then
+          mv ${{ github.event.inputs.DEVICE_PATH }}/omni_${{ github.event.inputs.DEVICE_NAME}}.mk ${{ github.event.inputs.DEVICE_PATH }}/twrp_${{ github.event.inputs.DEVICE_NAME}}.mk
+        sed -i 's|\(#include <libsnapshot/snapshot.h>\)|\1\n#include <private/android_filesystem_config.h>\n|' bootable/recovery/partitionmanager.cpp
+          sed -i "s/omni_${{ github.event.inputs.DEVICE_NAME }}/twrp_${{ github.event.inputs.DEVICE_NAME }}/g" ${{ github.event.inputs.DEVICE_PATH }}/twrp_${{ github.event.inputs.DEVICE_NAME}}.mk
+          sed -i "s/omni_${{ github.event.inputs.DEVICE_NAME }}/twrp_${{ github.event.inputs.DEVICE_NAME }}/g" ${{ github.event.inputs.DEVICE_PATH }}/AndroidProducts.mk
+          #sed -i '$s/$/\nTW_MAX_BRIGHTNESS := 2047\n/' device/xiaomi/thyme/BoardConfig.mk
+          grep -q '^TW_MAX_BRIGHTNESS' device/xiaomi/thyme/BoardConfig.mk || echo 'TW_MAX_BRIGHTNESS := 2047' >> device/xiaomi/thyme/BoardConfig.mk
+          cat <<-'EOF' >> device/xiaomi/thyme/BoardConfig.mk
+          # Force aggressive compiler optimization and strip debug elements
+          TW_INCLUDE_CRYPTO := true
+          TW_EXCLUDE_APEX := true
+          #PRODUCT_MINIMIZE_JAVA_DEBUG_INFO := true
+          STRIP_DEBUG_OUTPUTS := true
+          # Drop redundant layout binaries to drastically shrink size
+          TW_EXCLUDE_SUPERSU := true
+          TW_EXCLUDE_MTP := false
+          RECOVERY_BINARY_SOURCE_TYPE := xz
+          BOARD_MKBOOTIMG_ARGS += --dtb $(TARGET_PREBUILT_DTB)
+        EOF
+        fi
+
+        lunch twrp_${{ github.event.inputs.DEVICE_NAME }}-eng && make clean && mka adbd ${{ inputs.BUILD_TARGET }}image -j${nproc}
         popd
 
     - name: Set Build Date # Build date in UTC
       run: |
         echo "BUILD_DATE=$(TZ=UTC date +%Y%m%d)" >> $GITHUB_ENV
+
 
     - name: Check if the recovery exists # It makes the recovery.img and renames it to Orangefox*.img but the OG should also work
       if: always()
@@ -133,6 +164,14 @@ jobs:
         else
             echo "::warning::The zip file isn't present but make sure the image is from only after 100% completion in build stage"
         fi
+
+    - name: Setup upterm session
+      with:
+        wait-timeout-minutes: 20
+        # detached: true
+      # if: ${{ github.event_name == 'workflow_dispatch' && inputs.debug_enabled }}
+      if: ${{ failure() || inputs.debug_enabled }}
+      uses: owenthereal/action-upterm@v2
 
     - name: Upload to Release
       if: env.CHECK_IMG_IS_OK == 'true'
